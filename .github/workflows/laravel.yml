@@ -1,0 +1,63 @@
+name: Laravel
+
+on:
+  push:
+    branches: ['*']
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:latest
+        ports:
+          - 6379:6379
+    strategy:
+      fail-fast: true
+      matrix:
+        php: [8.2]
+
+    name: Tests
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Cache Dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.composer/cache/files
+          key: dependencies-php-composer-${{ hashFiles('composer.lock') }}
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: json, dom, curl, libxml, mbstring, zip
+          tools: composer:v2
+          coverage: xdebug
+
+      - name: Set up Node & NPM
+        uses: actions/setup-node@v2
+        with:
+          node-version: '18.x'
+
+      - name: Install PHP dependencies
+        run: composer install --no-interaction --no-progress --ansi
+
+      - name: Prepare Laravel
+        run: |
+          cp .env.example .env
+          touch database/database.sqlite
+          php artisan key:generate
+
+      - name: Pint
+        run: composer pint
+
+      - name: Tests
+        run: ./vendor/bin/phpunit
+
+      - name: Prettier
+        run: |
+          npm ci
+          npm run prettier:check
